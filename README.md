@@ -18,7 +18,7 @@ With an immersive, neon-punk glassmorphic UI (The "Aetheris Protocol") and a flo
 - **Styling**: Vanilla CSS (Tailored Aetheris Protocol tokens)
 - **Animations**: [Framer Motion](https://www.framer.com/motion/)
 - **Backend/Database**: [Supabase](https://supabase.com/) (Auth, PostgreSQL)
-- **AI Brain**: [Groq API](https://groq.com/) (Utilizing `llama-3.3-70b-versatile` & `llama-3.1-8b-instant` for ultra-fast text generation)
+- **AI Brain**: [Google Gemini 1.5 Flash](https://aistudio.google.com/app/apikey) (Primary — High-performance free tier) & [Groq API](https://groq.com/) (Fallback support for `llama-3.3-70b-versatile`)
 
 ## 🏎️ Running Locally
 
@@ -35,7 +35,11 @@ With an immersive, neon-punk glassmorphic UI (The "Aetheris Protocol") and a flo
 3. **Set up your environment variables**:
    Create a `.env.local` file in the root of the `learnquest` directory and add your keys:
    ```env
-   # Groq API for Dynamic Content Generation
+   # Recommended: Google Gemini API (Truly Free Tier, No Credit Card)
+   # Get at: https://aistudio.google.com/app/apikey
+   GEMINI_API_KEY=your_gemini_api_key_here
+
+   # Optional Fallback: Groq API 
    GROQ_API_KEY=gsk_your_groq_api_key_here
 
    # Supabase Authentication

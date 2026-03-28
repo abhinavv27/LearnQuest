@@ -2,54 +2,68 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { messages } = req.body;
   
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
+
+  if (!geminiKey && !groqKey) {
     return res.status(500).json({ 
-      error: "Missing GROQ_API_KEY in environment. If you are seeing this on a deployed site, please add it as a secret environment variable in your dashboard (e.g. Vercel) and redeploy." 
+      error: "Missing API Key. Please add GEMINI_API_KEY or GROQ_API_KEY to your environment/dashboard and redeploy." 
     });
   }
 
-  const systemMessage = {
-    role: "system",
-    content: `You are ARIA, the Adaptive Roadmap Intelligence Agent.
-This is the FIRST time you are meeting the user. Your goal here is purely psychological profiling: you need to figure out exactly how their mind works, how they solve problems, and how they learn best.
-Do NOT ask about specific topics (like Machine Learning or Coding). Instead, focus on cognitive psychology and learning methodologies.
-
-1. Introduce yourself briefly and ask your FIRST psychological profiling question (e.g., "When you face a seemingly impossible problem, what's your first instinct?", or "Do you prefer building things from scratch to understand them, or reading the instruction manual first?"). Do NOT ask all questions at once.
-2. Engage in a natural, back-and-forth conversation, asking exactly 3 questions total to gather deep context into their cognitive style.
-3. Keep responses strictly under 2 short paragraphs mapping their answers to real psychology/learning theories. Have a friendly, insightful, and slightly neon-punk persona.
-4. CRITICAL INSTRUCTION: Once you have asked your 3 questions and gathered sufficient psychological profile data, your final message MUST be purely a JSON object with NO OTHER TEXT. The JSON object must match this schema exactly:
+  const systemPrompt = `You are ARIA, the system-level Adaptive Roadmap Intelligence Agent for LearnQuest.
+You are in INITIALIZATION MODE. Your goal is to conduct a 3-turn cognitive profiling session with the user before they can access the platform.
+ARIA Persona: Friendly, observant, highly intelligent, slightly neon-punk but deeply interested in the user's mind.
+1. DO NOT mention technical stacks. Focus on HOW the user thinks, solves problems, and feels about learning.
+2. Ask one deep question at a time.
+3. Keep responses under 2 short paragraphs.
+4. CRITICAL: After the user has responded 3 times, you MUST conclude the session and provide their final 'Cognitive Archetype' by returning ONLY a JSON object with this exact schema:
 {
   "type": "result",
-  "psychProfile": "A catchy, 2-3 word title for their cognitive style (e.g., Relational Systems Thinker, Empirical Builder, Abstract Theorist)",
-  "traits": ["Trait 1", "Trait 2", "Trait 3"],
-  "desc": "A short 2-sentence description of how their mind works based on cognitive psychology, and how LearnQuest will adapt to help them study more effectively."
-}`
-  };
+  "archetype": "The Relational Systems Thinker",
+  "summary": "A 2-sentence description of how their mind works and what kind of learning environment suits them best."
+}`;
 
   try {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        messages: [systemMessage, ...messages],
-        temperature: 0.7
-      })
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      return res.status(response.status).json({ error: `Groq API Error: ${errorText}` });
-    }
+    if (geminiKey) {
+      const history = messages.map(m => ({
+        role: m.role === 'aria' ? 'model' : 'user',
+        parts: [{ text: m.text || m.content || "" }]
+      }));
 
-    const data = await response.json();
-    const content = data.choices[0].message.content;
-    
-    res.status(200).json({ reply: content });
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: history,
+          generationConfig: { temperature: 0.85, maxOutputTokens: 2048 }
+        })
+      });
+
+      if (!response.ok) throw new Error(`Gemini API Error: ${response.status}`);
+      const data = await response.json();
+      return res.status(200).json({ reply: data.candidates?.[0]?.content?.parts?.[0]?.text });
+    } else {
+      const groqMessages = [{ role: 'system', content: systemPrompt }, ...messages.map(m => ({
+        role: m.role === 'aria' ? 'assistant' : 'user',
+        content: m.text || m.content || ""
+      }))];
+
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${groqKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "llama-3.1-8b-instant",
+          messages: groqMessages,
+          temperature: 0.85
+        })
+      });
+
+      if (!response.ok) throw new Error(`Groq API Error: ${response.status}`);
+      const data = await response.json();
+      return res.status(200).json({ reply: data.choices[0].message.content });
+    }
   } catch (error) {
     console.error("Onboarding API error:", error);
     res.status(500).json({ error: error.message });
