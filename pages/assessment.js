@@ -330,7 +330,7 @@ export default function Assessment() {
               </div>
             </div>
 
-            <button className="btn btn-primary pulse-ringPulse" onClick={handleViewRoadmap} 
+            <button className="btn btn-primary pulse-ring" onClick={handleViewRoadmap} 
               style={{ padding: '20px 60px', fontSize: '1.2rem', borderRadius: 16, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', boxShadow: 'var(--glow-cyan)' }}>
               Open My Personalized Roadmap →
             </button>
@@ -343,6 +343,7 @@ export default function Assessment() {
         @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
         @keyframes levelUp { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
         @keyframes pulse-ring-red { 0%,100% { box-shadow: 0 0 0 0 rgba(255,68,68,0.5); } 50% { box-shadow: 0 0 0 10px rgba(255,68,68,0); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
     </>
   );
