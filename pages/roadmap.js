@@ -10,6 +10,7 @@ const Particles = dynamic(() => import('../components/Particles'), { ssr: false 
 export default function Roadmap() {
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const [activeLevel, setActiveLevel] = useState(1);
   const [hoveredNode, setHoveredNode] = useState(null);
   const [zoom, setZoom] = useState(0.72);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -20,12 +21,14 @@ export default function Roadmap() {
   useEffect(() => {
     const u = localStorage.getItem('lq_user');
     if (!u) { router.push('/auth'); return; }
-    setUser(JSON.parse(u));
-  }, []);
+    const parsedUser = JSON.parse(u);
+    setUser(parsedUser);
+    setActiveLevel(parsedUser.level || 1);
+  }, [router]);
 
   const getNodeCenter = (node) => ({ x: node.x + 28, y: node.y + 28 });
 
-  const getNodeById = (id) => ML_ROADMAP.find(n => n.id === id);
+
 
   const drawSmoothPath = (from, to) => {
     const sx = from.x + (from.isMajor ? 45 : 28);
@@ -58,7 +61,24 @@ export default function Roadmap() {
 
   if (!user) return null;
 
-  const completedXP = ML_ROADMAP.filter(n => n.status === 'done').reduce((s, n) => s + (n.xp || 0), 0);
+  const getNodeStatus = (n) => {
+    if (n.level === '?') {
+      if (n.id === 'H1') return activeLevel >= 7 ? ((activeLevel > 7) ? 'done' : 'active') : 'hidden';
+      if (n.id === 'H2') return activeLevel >= 13 ? ((activeLevel > 13) ? 'done' : 'active') : 'hidden';
+      return 'hidden';
+    }
+    const lvl = Number(n.level);
+    if (lvl < activeLevel) return 'done';
+    if (lvl === activeLevel) return 'active';
+    return 'locked';
+  };
+
+  const dynamicRoadmap = ML_ROADMAP.map(n => ({ ...n, status: getNodeStatus(n) }));
+  const getNodeById = (id) => dynamicRoadmap.find(n => n.id === id);
+
+  const completedXP = dynamicRoadmap.filter(n => n.status === 'done').reduce((s, n) => s + (n.xp || 0), 0);
+  const totalLevels = ML_ROADMAP.filter(n => typeof n.level === 'number').length; 
+  const completedLevels = dynamicRoadmap.filter(n => typeof n.level === 'number' && n.status === 'done').length;
 
   return (
     <>
@@ -184,7 +204,7 @@ export default function Roadmap() {
             </svg>
 
             {/* Nodes */}
-            {ML_ROADMAP.map(node => {
+            {dynamicRoadmap.map(node => {
               const isHovered = hoveredNode === node.id;
               return (
                 <div key={node.id}
@@ -232,7 +252,7 @@ export default function Roadmap() {
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Current Level</div>
             {(() => {
-              const active = ML_ROADMAP.find(n => n.status === 'active');
+              const active = dynamicRoadmap.find(n => n.status === 'active');
               return active ? (
                 <div className="card card-glow" style={{ padding: 16 }}>
                   <div style={{ fontFamily: 'var(--font-head)', fontWeight: 700, fontSize: '0.72rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Level {active.level}</div>
@@ -253,10 +273,10 @@ export default function Roadmap() {
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Progress</div>
             <div style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginBottom: 6 }}>
-              <span style={{ color: 'var(--cyan)', fontFamily: 'var(--font-head)', fontWeight: 700 }}>4</span> / 30 Levels
+              <span style={{ color: 'var(--cyan)', fontFamily: 'var(--font-head)', fontWeight: 700 }}>{completedLevels}</span> / {totalLevels} Levels
             </div>
             <div className="xp-bar-track" style={{ marginBottom: 8 }}>
-              <div className="xp-bar-fill" style={{ width: '13%' }} />
+              <div className="xp-bar-fill" style={{ width: `${(completedLevels / totalLevels) * 100}%` }} />
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{completedXP} XP earned</div>
           </div>

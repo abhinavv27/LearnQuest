@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import dynamic from 'next/dynamic';
 import Nav from '../../components/Nav';
-import { LEVEL_CONTENT, FLASHCARDS, TUTOR_RESPONSES, ML_ROADMAP } from '../../data/content';
+import { LEVEL_CONTENT, FLASHCARDS, TUTOR_RESPONSES, ML_ROADMAP, getFallbackContent } from '../../data/content';
 import useVoice from '../../hooks/useVoice';
 
 const ConceptVideo = dynamic(() => import('../../components/ConceptVideo'), { ssr: false });
@@ -335,6 +335,9 @@ function FlashcardPanel({ cards }) {
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 export default function LevelDetail() {
   const router = useRouter();
+  const { id } = router.query;
+  const node = ML_ROADMAP.find(n => n.id?.toString() === id?.toString()) || { title: 'Unknown Protocol', xp: 500, level: parseInt(id) || '?' };
+
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState('video');
   const [generating, setGenerating] = useState(false);
@@ -356,15 +359,9 @@ export default function LevelDetail() {
   }, [router]);
 
   useEffect(() => {
-    if (!router.isReady) return;
-    const { id } = router.query;
-    if (!id) return;
-    
-    // Look up the level title
-    const node = ML_ROADMAP.find(n => n.id.toString() === id.toString()) || { title: 'Unknown Protocol', xp: 500 };
+    if (!router.isReady || !id) return;
     
     const fetchDynamicLevel = async () => {
-      // 1. If we have a hardcoded fallback, we could use it immediately, but user wants them ALL dynamic!
       try {
         setLoading(true);
         const res = await fetch('/api/generate', {
@@ -375,27 +372,25 @@ export default function LevelDetail() {
         });
         const data = await res.json();
         if(res.ok && data.title) {
-          setLevelData(data);
+          setLevelData({ ...data, level: node.level });
           setCards(data.flashcards || []);
           setLoading(false);
         } else {
-          // fallback if API fails
           console.error("Using fallback due to API fail", data);
-          setLevelData(LEVEL_CONTENT[5]);
-          setCards(FLASHCARDS[5]);
+          setLevelData(LEVEL_CONTENT[id] ? { ...LEVEL_CONTENT[id], level: node.level } : { ...getFallbackContent(node), level: node.level });
+          setCards(FLASHCARDS[id] || getFallbackContent(node).flashcards);
           setLoading(false);
         }
       } catch (err) {
         console.error("Generate error", err);
-        setLevelData(LEVEL_CONTENT[5]);
-        setCards(FLASHCARDS[5]);
+        setLevelData(LEVEL_CONTENT[id] ? { ...LEVEL_CONTENT[id], level: node.level } : { ...getFallbackContent(node), level: node.level });
+        setCards(FLASHCARDS[id] || getFallbackContent(node).flashcards);
         setLoading(false);
       }
     };
     
-    // Let's force generate everything! Even if LEVEL_CONTENT[5] exists, it will fall back to it only if API fails.
     fetchDynamicLevel();
-  }, [router.isReady, router.query.id]);
+  }, [router.isReady, id]);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -415,7 +410,11 @@ export default function LevelDetail() {
     setCompleting(true);
     await new Promise(r => setTimeout(r, 1500));
     const u = JSON.parse(localStorage.getItem('lq_user'));
-    u.xp = Math.min(u.xp + levelData.xp, 2999);
+    u.xp = Math.min(u.xp + levelData.xp, 75000);
+    // Level Progression Logic
+    if (typeof node.level === 'number' && u.level <= node.level) {
+      u.level = node.level + 1;
+    }
     localStorage.setItem('lq_user', JSON.stringify(u));
     setCompleting(false);
     setCompleted(true);
@@ -439,7 +438,7 @@ export default function LevelDetail() {
 
   return (
     <>
-      <Head><title>Level 5: {level.title} — LearnQuest</title></Head>
+      <Head><title>Level {level.level}: {level.title} — LearnQuest</title></Head>
 
       {/* Fixed background */}
       <div style={{ position: 'fixed', inset: 0, background: 'var(--bg-deep)', zIndex: 0 }} />
@@ -465,7 +464,7 @@ export default function LevelDetail() {
           <span style={{ opacity: 0.4 }}>›</span>
           <span onClick={() => router.push('/roadmap')} style={{ cursor: 'pointer', transition: 'color 0.2s' }} onMouseEnter={e => e.currentTarget.style.color = 'var(--cyan)'} onMouseLeave={e => e.currentTarget.style.color = ''}>Machine Learning</span>
           <span style={{ opacity: 0.4 }}>›</span>
-          <span style={{ color: 'var(--cyan)', fontWeight: 600 }}>Level 5: {level.title}</span>
+          <span style={{ color: 'var(--cyan)', fontWeight: 600 }}>Level {level.level}: {level.title}</span>
         </div>
 
         {/* TWO-COLUMN LAYOUT */}
@@ -477,7 +476,7 @@ export default function LevelDetail() {
             {/* Level Header */}
             <div style={{ marginBottom: 36 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                <span style={{ padding: '4px 14px', borderRadius: 999, background: 'rgba(123,47,255,0.15)', border: '1px solid rgba(123,47,255,0.35)', fontSize: '0.75rem', color: 'var(--violet)', fontFamily: 'var(--font-head)', fontWeight: 700 }}>LEVEL 5</span>
+                <span style={{ padding: '4px 14px', borderRadius: 999, background: 'rgba(123,47,255,0.15)', border: '1px solid rgba(123,47,255,0.35)', fontSize: '0.75rem', color: 'var(--violet)', fontFamily: 'var(--font-head)', fontWeight: 700, textTransform: 'uppercase' }}>LEVEL {level.level}</span>
                 <span style={{ padding: '4px 14px', borderRadius: 999, background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.25)', fontSize: '0.75rem', color: 'var(--gold)', fontWeight: 700 }}>⚡ {level.xp} XP</span>
                 <span style={{ padding: '4px 14px', borderRadius: 999, background: 'rgba(0,255,136,0.06)', border: '1px solid rgba(0,255,136,0.2)', fontSize: '0.75rem', color: '#00ff88', fontWeight: 600 }}>Intermediate</span>
               </div>
@@ -649,7 +648,7 @@ export default function LevelDetail() {
             <div style={{ padding: '20px', borderBottom: '1px solid rgba(0,245,255,0.06)' }}>
               <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Your Progress</div>
               <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                {[{ label: 'Level', val: '5 / 30', color: 'var(--cyan)' }, { label: 'XP', val: `${user.xp.toLocaleString()}`, color: 'var(--gold)' }, { label: 'Streak', val: `🔥 ${user.streak}d`, color: '#FF6B35' }].map((s, i) => (
+                {[{ label: 'Level', val: `${user.level} / 30`, color: 'var(--cyan)' }, { label: 'XP', val: `${user.xp.toLocaleString()}`, color: 'var(--gold)' }, { label: 'Streak', val: `🔥 ${user.streak}d`, color: '#FF6B35' }].map((s, i) => (
                   <div key={i} style={{ flex: 1, padding: '10px 8px', background: 'var(--surface-bright)', borderRadius: 8, textAlign: 'center' }}>
                     <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{s.label}</div>
                     <div style={{ fontFamily: 'var(--font-head)', fontWeight: 700, fontSize: '0.9rem', color: s.color }}>{s.val}</div>
@@ -665,7 +664,7 @@ export default function LevelDetail() {
               <div style={{ padding: '16px 20px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
                   <div style={{ fontFamily: 'var(--font-head)', fontWeight: 700, fontSize: '0.9rem', color: 'var(--violet)' }}>📚 Flashcards</div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Level 5 · {cards.length} cards</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Level {level.level} · {cards.length} cards</div>
                 </div>
                 <span style={{ borderTop: '2px solid var(--violet)', width: 36, display: 'inline-block' }} />
               </div>

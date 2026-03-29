@@ -41,6 +41,26 @@ export const ML_CONNECTIONS = [
 ];
 
 // Level content (main content area)
+export const getFallbackContent = (node) => ({
+  title: node.title || 'Unknown Topic',
+  subtitle: `A comprehensive overview of ${node.title || 'this topic'}`,
+  xp: node.xp || 300,
+  video_summary: `This is a generated placeholder summary for ${node.title}.\n\nIn this module, you will learn the foundational concepts, mathematical intuitions, and real-world applications of this technology. By the end of this level, you'll be able to practically implement these concepts.`,
+  manim_code: `from manim import *\n# Code for ${node.title}\nclass Animation(Scene):\n    def construct(self):\n        title = Text("${node.title}").scale(1.5)\n        self.play(Write(title))\n        self.wait(2)`,
+  slides: [
+    { num: 1, title: `Introduction to ${node.title}`, bullets: ['Foundational theory and context', 'Why this matters in the real world'], visual: 'Diagram showing architecture' },
+    { num: 2, title: `Mathematical Foundations`, bullets: ['Equation breakdown', 'Underlying intuitions'], visual: 'Graph or plot' }
+  ],
+  key_concepts: [
+    { term: 'Core Principle', def: `The fundamental idea behind ${node.title}` },
+    { term: 'Application', def: `How it is used in industry` }
+  ],
+  flashcards: [
+    { q: `What is the primary goal of ${node.title}?`, a: 'To solve complex domain-specific problems efficiently.' },
+    { q: `Name one key advantage of this approach.`, a: 'It scales well with large datasets and handles non-linearities.' }
+  ]
+});
+
 export const LEVEL_CONTENT = {
   5: {
     title: 'Supervised Learning',
